@@ -10,14 +10,14 @@
 #endif
 // Set initial input parameters
 enum Ascale {
-  AFS_2G = 0,
+  AFS_2G ,
   AFS_4G,
   AFS_8G,
   AFS_16G
 };
 
 enum Gscale {
-  GFS_250DPS = 0,
+  GFS_250DPS ,
   GFS_500DPS,
   GFS_1000DPS,
   GFS_2000DPS

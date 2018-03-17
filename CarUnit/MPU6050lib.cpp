@@ -2,8 +2,8 @@
 //====== Set of useful function to access acceleratio, gyroscope, and temperature data
 //===================================================================================================================
 #include "MPU6050lib.h"
-int Gscale = GFS_250DPS;
-int Ascale = AFS_2G;
+int Gscale = GFS_500DPS;
+int Ascale = AFS_16G;
 
 float MPU6050lib::getGres() {
   switch (Gscale)
