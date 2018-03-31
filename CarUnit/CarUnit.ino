@@ -5,17 +5,17 @@
 TinyGPS gps;                     //GPS
 LiquidCrystal_I2C lcd(0x3f, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
 WiFiEspClient client;
-MPU6050lib mpu;
-
-const int DOUTpin = 3; //the DOUT pin of the alcohol sensor
+const int DOUTpin = 2; //the DOUT pin of the alcohol sensor
 volatile byte drunk = false;
+void drunkDriver();
 int status = WL_IDLE_STATUS;     // the Wifi radio's status
-#define NSSID        "SAU-wifi"
-#define PASS    "12345678"
-#define HOST_NAME "10.85.94.134"
+#define NSSID "SAU-wifi"
+#define PASS  "12345678"
+#define HOST_NAME "10.85.94.49"
 #define HOST_PORT 5100
+#define airbag 22
 //************************************************************Accelerometer
-int intPin = 2;  // This can be changed, 2 and 3 are the Arduinos ext int pins
+int intPin = 3;  // This can be changed, 2 and 3 are the Arduinos ext int pins
 int16_t accelCount[3];           // Stores the 16-bit signed accelerometer sensor output
 float ax, ay, az;                // Stores the real accel value in g's
 int16_t gyroCount[3];            // Stores the 16-bit signed gyro sensor output
@@ -23,47 +23,98 @@ float gx, gy, gz;                // Stores the real gyro value in degrees per se
 float gyroBias[3], accelBias[3]; // Bias corrections for gyro and accelerometer
 int16_t tempCount;               // Stores the internal chip temperature sensor output
 float temperature;               // Scaled temperature in degrees Celsius
-float aRes, gRes; // scale resolutions per LSB for the sensors
 float SelfTest[6];               // Gyro and accelerometer self-test sensor output
+uint32_t count = 0;
+float aRes, gRes; // scale resolutions per LSB for the sensors
+MPU6050lib mpu;
 //************************************************************Accelerometer
-
+float flat, flon, fspeed;
 void setup(void)
 {
-  pinMode(DOUTpin, INPUT_PULLUP);
-  pinMode(intPin, INPUT);//for accelerometer
-  digitalWrite(intPin, LOW);//for accelerometer
+  Wire.begin();
+  pinMode(DOUTpin, INPUT);
+  digitalWrite(DOUTpin, LOW);
+  attachInterrupt(digitalPinToInterrupt(DOUTpin), drunkDriver, HIGH);
+  pinMode(intPin, INPUT);
+  digitalWrite(intPin, LOW);
+  Serial.begin(9600);
+  Serial1.begin(115200);
+  Serial2.begin(9600);
   mpu.MPU6050SelfTest(SelfTest);
   mpu.calibrateMPU6050(gyroBias, accelBias);
   mpu.initMPU6050();
-  attachInterrupt(digitalPinToInterrupt(DOUTpin), drunkDriver, HIGH);
-  // initialize serial for ESP module
-  Serial.begin(9600);
-  Serial1.begin(115200);
+
+  if (SelfTest[0] < 1.0f && SelfTest[1] < 1.0f && SelfTest[2] < 1.0f && SelfTest[3] < 1.0f && SelfTest[4] < 1.0f && SelfTest[5] < 1.0f) {
+    Serial.println("Pass Selftest!");
+
+    mpu.calibrateMPU6050(gyroBias, accelBias);
+    mpu.initMPU6050();
+  }
+  else
+  {
+    Serial.println("Could not connect to MPU6050");
+    while (1) ; // Loop forever if communication doesn't happen
+  }
+  lcd.begin(16, 2);
+  lcd.clear();
+  lcd.home();
   WiFi.init(&Serial1);
+
   while ( status != WL_CONNECTED) {
-    Serial.print("Attempting to connect to WPA SSID: ");
+    lcd.clear();
+    lcd.home();
+    lcd.print("trying to ");
+    lcd.setCursor(0,1);
+    lcd.print("connect to wifi");
     Serial.println(NSSID);
-    // Connect to WPA/WPA2 network
     status = WiFi.begin(NSSID, PASS);
   }
-  Serial.println("You're connected to the network");
-  printWifiStatus();
+   lcd.clear();
+  lcd.home();
+  lcd.print("connected to:");
+  lcd.setCursor(0, 1);
+  lcd.print(WiFi.SSID());
+
   if (client.connect(HOST_NAME, HOST_PORT))
-    Serial.println("connected");
+  {
+    lcd.clear();
+    lcd.home();
+    lcd.print("Connected to");
+    lcd.setCursor(1,0);
+    lcd.print("server");
+   }
   else
-    Serial.println("not connacted");
-  Wire.begin();
-  lcd.begin(16, 2);
+  {
+    lcd.clear();
+    lcd.home();
+    lcd.print("Couldn't connect");
+    lcd.setCursor(1,0);
+    lcd.print("to the server!");
+    while(1){}
+  }
+
+  lcd.clear();
+  lcd.home();
+  lcd.print("      V2I!      ");
+  lcd.setCursor(0, 1);
+  lcd.print("     SYSTEM     ");
+  Serial.println("setup done");
 }
 
 void loop(void)
 {
-  // If data ready bit set, all data registers have new data
-  if (mpu.readByte(MPU6050_ADDRESS, INT_STATUS) & 0x01) { // check if data ready interrupt
+
+  if (digitalRead(airbag) == HIGH) {
+    client.print("airbag," + String(flat) + ',' + String(flon));
+    lcd.clear();
+    lcd.home();
+    lcd.print("AIRBAG");
+    while (1) {}
+
+  }
+  if ( mpu.readByte(MPU6050_ADDRESS, INT_STATUS) & 0x01)  { // check if data ready interrupt
     mpu.readAccelData(accelCount);  // Read the x/y/z adc values
     aRes = mpu.getAres();
-
-    // Now we'll calculate the accleration value into actual g's
     ax = (float)accelCount[0] * aRes - accelBias[0]; // get actual g value, this depends on scale being set
     ay = (float)accelCount[1] * aRes - accelBias[1];
     az = (float)accelCount[2] * aRes - accelBias[2];
@@ -72,59 +123,53 @@ void loop(void)
     gRes = mpu.getGres();
 
     // Calculate the gyro value into actual degrees per second
-    gx = (float)gyroCount[0] * gRes; // get actual gyro value, this depends on scale being set
-    gy = (float)gyroCount[1] * gRes;
-    gz = (float)gyroCount[2] * gRes;
-
-    tempCount = mpu.readTempData();  // Read the x/y/z adc values
-    temperature = ((float) tempCount) / 340.0 + 36.53; // Temperature in degrees Centigrade
+    gx = (float)gyroCount[0] * gRes - gyroBias[0]; // get actual gyro value, this depends on scale being set
+    gy = (float)gyroCount[1] * gRes - gyroBias[1];
+    gz = (float)gyroCount[2] * gRes - gyroBias[2];
+    if ((gx > 45 || gx < -45 || gy > 45 || gy < -45) && millis() > 400 ) {
+      client.print("rollover," + String(flat) + ',' + String(flon));
+      lcd.clear();
+      lcd.home();
+      lcd.print("ROLLOVER");
+      while(1){}
+    }
   }
 
-  client.print("Ger X,Y,Z " + String(gx) + " " + String(gy) + " " + String(gz) + " Acc X,Y,Z " + String(ax) + " " + String(ay) + " " + String(az) + " " + String(temperature));
+  if (Serial2.available()) {
+    char c = Serial2.read();
+    if (gps.encode(c))
+    {
+      gps.f_get_position(&flat, &flon);
+      fspeed = gps.f_speed_kmph();
+    }
+  }
+  if (fspeed > 120) {
+    lcd.clear();
+    lcd.home();
+    lcd.print("SPEED TICKET");
+    lcd.setCursor(0, 1);
+    lcd.print("AM CALLING POLICE!");
+    client.print("speed," + String(flat) + ',' + String(flon));
+    while (1) {}
+  }
   if (drunk) {
-    client.print("drunk driver detected:)");
+    lcd.clear();
+    lcd.home();
+    lcd.print("YOU ARE DRUNK I");
+    lcd.setCursor(0, 1);
+    lcd.print("CALLING POLICE!");
+    client.print("drunk," + String(flat) + ',' + String(flon));
+    while (1) {}
     drunk = false;
   }
+
   if (!client.connected()) {
-      client.connect(HOST_NAME, HOST_PORT);
-  }
-  
-}
-
-void printFloat(double number, int digits)    //GPS
-{
-  // Handle negative numbers
-  if (number < 0.0)
-  {
-    Serial.print('-');
-    number = -number;
-  }
-
-  // Round correctly so that print(1.999, 2) prints as "2.00"
-  double rounding = 0.5;
-  for (uint8_t i = 0; i < digits; ++i)
-    rounding /= 10.0;
-
-  number += rounding;
-
-  // Extract the integer part of the number and print it
-  unsigned long int_part = (unsigned long)number;
-  double remainder = number - (double)int_part;
-  Serial.print(int_part);
-
-  // Print the decimal point, but only if there are digits beyond
-  if (digits > 0)
-    Serial.print(".");
-
-  // Extract digits from the remainder one at a time
-  while (digits-- > 0)
-  {
-    remainder *= 10.0;
-    int toPrint = int(remainder);
-    Serial.print(toPrint);
-    remainder -= toPrint;
+    client.connect(HOST_NAME, HOST_PORT);
   }
 }
+
+
+
 void printWifiStatus()
 {
   // print the SSID of the network you're attached to
