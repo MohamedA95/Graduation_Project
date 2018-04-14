@@ -1,19 +1,20 @@
 #include <LiquidCrystal_I2C.h>
 #include "WiFiEsp.h"
 #include "MPU6050lib.h"
-#include <TinyGPS.h>              //GPS
-TinyGPS gps;                     //GPS
+#include <TinyGPS.h> 
+TinyGPS gps;                     
 LiquidCrystal_I2C lcd(0x3f, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
 WiFiEspClient client;
 const int DOUTpin = 2; //the DOUT pin of the alcohol sensor
 volatile byte drunk = false;
 void drunkDriver();
 int status = WL_IDLE_STATUS;     // the Wifi radio's status
-#define NSSID "SAU-wifi"
-#define PASS  "12345678"
-#define HOST_NAME "10.85.94.49"
+#define NSSID "wifi"
+#define PASS  "0123456789"
+#define HOST_NAME "0.0.0.0"
 #define HOST_PORT 5100
 #define airbag 22
+#define carid "1f5d8ea9s6"
 //************************************************************Accelerometer
 int intPin = 3;  // This can be changed, 2 and 3 are the Arduinos ext int pins
 int16_t accelCount[3];           // Stores the 16-bit signed accelerometer sensor output
@@ -29,6 +30,9 @@ float aRes, gRes; // scale resolutions per LSB for the sensors
 MPU6050lib mpu;
 //************************************************************Accelerometer
 float flat, flon, fspeed;
+int year;
+byte month, day, hour, minute, second, hundredths;
+unsigned long fix_age;
 void setup(void)
 {
   Wire.begin();
@@ -80,7 +84,7 @@ void setup(void)
     lcd.clear();
     lcd.home();
     lcd.print("Connected to");
-    lcd.setCursor(1,0);
+    lcd.setCursor(0,1);
     lcd.print("server");
    }
   else
@@ -88,9 +92,9 @@ void setup(void)
     lcd.clear();
     lcd.home();
     lcd.print("Couldn't connect");
-    lcd.setCursor(1,0);
+    lcd.setCursor(0,1);
     lcd.print("to the server!");
-    while(1){}
+   // while(1){}
   }
 
   lcd.clear();
@@ -103,25 +107,23 @@ void setup(void)
 
 void loop(void)
 {
-
+  //reconnect if wifi is disconnected
+  if (!client.connected()) {
+    client.connectSSL(HOST_NAME, HOST_PORT);
+  }
+  //look for airbag signal
   if (digitalRead(airbag) == HIGH) {
     client.print("airbag," + String(flat) + ',' + String(flon));
     lcd.clear();
     lcd.home();
     lcd.print("AIRBAG");
-    while (1) {}
+   // while (1) {}
 
   }
-  if ( mpu.readByte(MPU6050_ADDRESS, INT_STATUS) & 0x01)  { // check if data ready interrupt
-    mpu.readAccelData(accelCount);  // Read the x/y/z adc values
-    aRes = mpu.getAres();
-    ax = (float)accelCount[0] * aRes - accelBias[0]; // get actual g value, this depends on scale being set
-    ay = (float)accelCount[1] * aRes - accelBias[1];
-    az = (float)accelCount[2] * aRes - accelBias[2];
-
+  //check gyro values for rollover
+    if ( mpu.readByte(MPU6050_ADDRESS, INT_STATUS) & 0x01)  { // check if data ready interrupt
     mpu.readGyroData(gyroCount);  // Read the x/y/z adc values
     gRes = mpu.getGres();
-
     // Calculate the gyro value into actual degrees per second
     gx = (float)gyroCount[0] * gRes - gyroBias[0]; // get actual gyro value, this depends on scale being set
     gy = (float)gyroCount[1] * gRes - gyroBias[1];
@@ -131,45 +133,43 @@ void loop(void)
       lcd.clear();
       lcd.home();
       lcd.print("ROLLOVER");
-      while(1){}
+    //  while(1){}
     }
   }
 
-  if (Serial2.available()) {
+  //check gps for speed and position
+    if (Serial2.available()) {
     char c = Serial2.read();
     if (gps.encode(c))
     {
       gps.f_get_position(&flat, &flon);
       fspeed = gps.f_speed_kmph();
+      gps.crack_datetime(&year, &month, &day,&hour, &minute, &second, &hundredths, &fix_age);
     }
   }
-  if (fspeed > 120) {
+  //report if speed is high
+  if (fspeed > 100) {
     lcd.clear();
     lcd.home();
     lcd.print("SPEED TICKET");
     lcd.setCursor(0, 1);
     lcd.print("AM CALLING POLICE!");
     client.print("speed," + String(flat) + ',' + String(flon));
-    while (1) {}
+   //while (1) {}
   }
-  if (drunk) {
+  //report if drunk
+    if (drunk) {
     lcd.clear();
     lcd.home();
-    lcd.print("YOU ARE DRUNK I");
+    lcd.print("YOU ARE DRUNK");
     lcd.setCursor(0, 1);
     lcd.print("CALLING POLICE!");
     client.print("drunk," + String(flat) + ',' + String(flon));
-    while (1) {}
-    drunk = false;
+   // while (1) {}
+   // drunk = false;
   }
 
-  if (!client.connected()) {
-    client.connect(HOST_NAME, HOST_PORT);
-  }
 }
-
-
-
 void printWifiStatus()
 {
   // print the SSID of the network you're attached to
