@@ -10,7 +10,7 @@ volatile byte drunk = false;
 void drunkDriver();
 int status = WL_IDLE_STATUS;     // the Wifi radio's status
 #define NSSID "wifi"
-#define PASS  "0123456789"
+#define PASS  "12345678"
 #define HOST_NAME "0.0.0.0"
 #define HOST_PORT 5100
 #define airbag 22
@@ -79,7 +79,7 @@ void setup(void)
   lcd.setCursor(0, 1);
   lcd.print(WiFi.SSID());
 
-  if (client.connect(HOST_NAME, HOST_PORT))
+  if (client.connectSSL(HOST_NAME, HOST_PORT))
   {
     lcd.clear();
     lcd.home();
@@ -94,7 +94,7 @@ void setup(void)
     lcd.print("Couldn't connect");
     lcd.setCursor(0,1);
     lcd.print("to the server!");
-   // while(1){}
+    while(1){}
   }
 
   lcd.clear();
@@ -102,7 +102,6 @@ void setup(void)
   lcd.print("      V2I!      ");
   lcd.setCursor(0, 1);
   lcd.print("     SYSTEM     ");
-  Serial.println("setup done");
 }
 
 void loop(void)
@@ -117,7 +116,7 @@ void loop(void)
     lcd.clear();
     lcd.home();
     lcd.print("AIRBAG");
-   // while (1) {}
+    while (1) {}
 
   }
   //check gyro values for rollover
@@ -133,7 +132,7 @@ void loop(void)
       lcd.clear();
       lcd.home();
       lcd.print("ROLLOVER");
-    //  while(1){}
+      while(1){}
     }
   }
 
@@ -154,19 +153,19 @@ void loop(void)
     lcd.print("SPEED TICKET");
     lcd.setCursor(0, 1);
     lcd.print("AM CALLING POLICE!");
-    client.print("speed," + String(flat) + ',' + String(flon));
-   //while (1) {}
+    client.print("speed," + String(flat) + ',' + String(flon)+','+carid);
+   while (1) {}
   }
   //report if drunk
     if (drunk) {
+      client.print("drunk," + String(flat) + ',' + String(flon)+','+carid);
     lcd.clear();
     lcd.home();
     lcd.print("YOU ARE DRUNK");
     lcd.setCursor(0, 1);
     lcd.print("CALLING POLICE!");
-    client.print("drunk," + String(flat) + ',' + String(flon));
-   // while (1) {}
-   // drunk = false;
+    while (1) {}
+    drunk = false;
   }
 
 }
