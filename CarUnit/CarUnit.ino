@@ -10,7 +10,7 @@ volatile byte drunk = false;
 void drunkDriver();
 int status = WL_IDLE_STATUS;     // the Wifi radio's status
 #define NSSID "wifi"
-#define PASS  "12345678"
+#define PASS  "123"
 #define HOST_NAME "0.0.0.0"
 #define HOST_PORT 5100
 #define airbag 22
@@ -41,7 +41,6 @@ void setup(void)
   attachInterrupt(digitalPinToInterrupt(DOUTpin), drunkDriver, HIGH);
   pinMode(intPin, INPUT);
   digitalWrite(intPin, LOW);
-  Serial.begin(9600);
   Serial1.begin(115200);
   Serial2.begin(9600);
   mpu.MPU6050SelfTest(SelfTest);
@@ -49,14 +48,15 @@ void setup(void)
   mpu.initMPU6050();
 
   if (SelfTest[0] < 1.0f && SelfTest[1] < 1.0f && SelfTest[2] < 1.0f && SelfTest[3] < 1.0f && SelfTest[4] < 1.0f && SelfTest[5] < 1.0f) {
-    Serial.println("Pass Selftest!");
 
     mpu.calibrateMPU6050(gyroBias, accelBias);
     mpu.initMPU6050();
   }
   else
   {
-    Serial.println("Could not connect to MPU6050");
+    lcd.clear();
+    lcd.home();
+    lcd.print("Could not connect to MPU6050");
     while (1) ; // Loop forever if communication doesn't happen
   }
   lcd.begin(16, 2);
@@ -70,10 +70,9 @@ void setup(void)
     lcd.print("trying to ");
     lcd.setCursor(0,1);
     lcd.print("connect to wifi");
-    Serial.println(NSSID);
     status = WiFi.begin(NSSID, PASS);
   }
-   lcd.clear();
+  lcd.clear();
   lcd.home();
   lcd.print("connected to:");
   lcd.setCursor(0, 1);
@@ -152,13 +151,13 @@ void loop(void)
     lcd.home();
     lcd.print("SPEED TICKET");
     lcd.setCursor(0, 1);
-    lcd.print("AM CALLING POLICE!");
+    lcd.print("CALLING POLICE!");
     client.print("speed," + String(flat) + ',' + String(flon)+','+carid);
    while (1) {}
   }
   //report if drunk
     if (drunk) {
-      client.print("drunk," + String(flat) + ',' + String(flon)+','+carid);
+    client.print("drunk," + String(flat) + ',' + String(flon)+','+carid);
     lcd.clear();
     lcd.home();
     lcd.print("YOU ARE DRUNK");
@@ -169,23 +168,7 @@ void loop(void)
   }
 
 }
-void printWifiStatus()
-{
-  // print the SSID of the network you're attached to
-  Serial.print("SSID: ");
-  Serial.println(WiFi.SSID());
 
-  // print your WiFi shield's IP address
-  IPAddress ip = WiFi.localIP();
-  Serial.print("IP Address: ");
-  Serial.println(ip);
-
-  // print the received signal strength
-  long rssi = WiFi.RSSI();
-  Serial.print("Signal strength (RSSI):");
-  Serial.print(rssi);
-  Serial.println(" dBm");
-}
 void drunkDriver() {
   drunk = true;
 }
