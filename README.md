@@ -1,8 +1,8 @@
 # Graduation_Project
-V2I communication system for traffic management using.
-The sytem tries to manage traffic in an efficent manaer. 
-Done by
-Mohamed   Ahmed
-Khalid  Alruwayti
-Mahmoud Al Dahdouh
+V2I communication system for traffic management using.\n
+the system tried to manage traffic in an efficient manager.\n
+Done by\n
+Mohamed   Ahmed\n
+Khalid  Alruwayti\n
+Mahmoud Al Dahdouh\n
 Abdulrahman   Al Bishi
